@@ -17,7 +17,8 @@
         "node": "0.12.00"
     },
     "scripts": {
-        "start": "NODE_ENV=development ./node_modules/.bin/nodemon server.js"
+        "start": "NODE_ENV=development ./node_modules/.bin/nodemon server.js",
+        "test": "NODE_ENV=development ./node_modules/.bin/nodemon test.js"
     },
     "dependencies": {
         "async": "0.9.0",

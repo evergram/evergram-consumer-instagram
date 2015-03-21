@@ -42,7 +42,7 @@ Consumer.prototype.consume = function () {
                      * Get the printable images, delete the message from SQS and
                      * save the user with the last run and in queue flag.
                      */
-                    instagram.manager.findPrintablePosts(user)
+                    instagram.manager.findImagesByUser(user)
                     .then(function (images) {
                         console.log('Got images', images);
 
@@ -55,6 +55,7 @@ Consumer.prototype.consume = function () {
                                 user.save(resolve);
                             });
                         });
+                        resolve();
                     }, function () {
                         //if there's an error delete and resolve
                         deleteMessageFromQueue(results[0]).then(resolve);
