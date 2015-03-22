@@ -11,7 +11,7 @@ var printManager = common.print.manager;
 //init db
 common.db.connect();
 
-var josh = '550cf5bd0b398f7d0c5470ce';
+var josh = '550e124a1b352fe6209b74a5';
 var luisa = '550ce83feb09674d27237923';
 
 User.findOne({'_id': josh}, function (err, user) {
@@ -21,14 +21,15 @@ User.findOne({'_id': josh}, function (err, user) {
         .then(function (images) {
             //get all printable images
             userImages = images;
-            return printManager.findCurrentByUser(user);
-        }).then(function (printableImageSet) {
-            if (printableImageSet == null) {
-                printableImageSet = printManager.getNewPrintableImageSet(user);
-            }
-            printManager.addImagesToSet(printableImageSet.instagram, userImages);
-            return printManager.save(printableImageSet);
-        }).then(function (printableImageSet) {
+            console.log(images.length);
+        //    return printManager.findCurrentByUser(user);
+        //}).then(function (printableImageSet) {
+        //    if (printableImageSet == null) {
+        //        printableImageSet = printManager.getNewPrintableImageSet(user);
+        //    }
+        //    printManager.addImagesToSet(printableImageSet.instagram, userImages);
+        //    return printManager.save(printableImageSet);
+        //}).then(function (printableImageSet) {
 
         });
     }
