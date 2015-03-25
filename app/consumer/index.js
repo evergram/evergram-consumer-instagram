@@ -40,48 +40,57 @@ Consumer.prototype.consume = function () {
             User.findOne({'_id': id}, function (err, user) {
                 if (user != null) {
                     var userImages = [];
+                    var userPrintableImageSet;
                     var dateRun = new Date();
 
-                    console.log('getting images');
-
                     /**
-                     * Get the printable images for the user
+                     * Getting an existing printable image set, or create a new one.
                      */
-                    instagram.manager.findPrintableImagesByUser(user)
-                    .then(function (images) {
-                        //get all printable images
-                        userImages = images;
-                        return print.manager.findCurrentByUser(user);
-                    }, resolve)
-                    /**
-                     * Getting an existing printable image set, or create a new one,
-                     * then add the found images to it.
-                     */
+                    print.manager.findCurrentByUser(user)
                     .then(function (printableImageSet) {
                         if (printableImageSet == null) {
-                            printableImageSet = print.manager.getNewPrintableImageSet(user);
+                            userPrintableImageSet = print.manager.getNewPrintableImageSet(user);
+                        } else {
+                            userPrintableImageSet = printableImageSet;
                         }
 
-                        //add the new images
-                        printableImageSet.addImages('instagram', userImages);
-
-                        return print.manager.save(printableImageSet);
+                        console.log('Getting printable images for:', user.instagram.username);
+                        /**
+                         * If we are a new user we won't put any date restrictions on the query
+                         */
+                        if (user.isInFirstPeriod()) {
+                            return instagram.manager.findPrintableImagesByUser(user);
+                        } else {
+                            return instagram.manager.findPrintableImagesByUser(user, userPrintableImageSet.date);
+                        }
                     }, resolve)
                     /**
-                     * Remove the message from the queue.
+                     * Get the printable images for the user and add them to the printable set
                      */
+                    .then(function (images) {
+                        console.log('Found ' + images.length + ' images for:', user.instagram.username);
+
+                        //add the new images
+                        userPrintableImageSet.addImages('instagram', images);
+                        //save to db
+                        return print.manager.save(userPrintableImageSet);
+                    }, resolve)
+                    /**
+                    * Remove the message from the queue.
+                    */
                     .then(function (printableImageSet) {
-                        console.log('saved images');
+                        console.log('Saved images for: ', user.instagram.username);
                         return deleteMessageFromQueue(message);
                     }, resolve)
                     /**
-                     * Save the user with a new last run and in queue state.
-                     */
+                    * Save the user with a new last run and in queue state.
+                    */
                     .then(function () {
+                        var nextRun = getNextRunDate(dateRun);
+                        console.log('Updating user ' + user.instagram.username + ' with next run on:', nextRun);
                         user.jobs.instagram.lastRunOn = dateRun;
-                        user.jobs.instagram.nextRunOn = getNextRunDate(dateRun);
+                        user.jobs.instagram.nextRunOn = nextRun;
                         user.jobs.instagram.inQueue = false;
-                        console.log(user);
                         user.save(resolve);
                     }, resolve);
                 } else {
