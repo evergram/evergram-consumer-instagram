@@ -11,26 +11,37 @@ var printManager = common.print.manager;
 //init db
 common.db.connect();
 
-var josh = '550e124a1b352fe6209b74a5';
-var luisa = '550ce83feb09674d27237923';
+var username = 'richard_obrien';
 
-User.findOne({'_id': josh}, function (err, user) {
+User.findOne({'instagram.username': username}, function (err, user) {
     if (user) {
-        var userImages = [];
-        instagram.manager.findPrintableImagesByUser(user)
-        .then(function (images) {
-            //get all printable images
-            userImages = images;
-            console.log(images.length);
-        //    return printManager.findCurrentByUser(user);
-        //}).then(function (printableImageSet) {
-        //    if (printableImageSet == null) {
-        //        printableImageSet = printManager.getNewPrintableImageSet(user);
-        //    }
-        //    printManager.addImagesToSet(printableImageSet.instagram, userImages);
-        //    return printManager.save(printableImageSet);
-        //}).then(function (printableImageSet) {
+        console.log('Found: ', user.getUsername());
 
+        printManager.findCurrentByUser(user)
+        .then(function (printableImageSet) {
+            if (printableImageSet == null) {
+                userPrintableImageSet = printManager.getNewPrintableImageSet(user);
+            } else {
+                userPrintableImageSet = printableImageSet;
+            }
+
+            console.log('Getting printable images for:', user.instagram.username);
+            /**
+             * If we are a new user we won't put any date restrictions on the query
+             */
+            if (user.isInFirstPeriod()) {
+                console.log(user.getUsername(), 'is in their first period');
+                return instagram.manager.findPrintableImagesByUser(user);
+            } else {
+                console.log(user.getUsername(), 'is in their', userPrintableImageSet.date);
+                return instagram.manager.findPrintableImagesByUser(user, userPrintableImageSet.date);
+            }
+        })
+        /**
+         * Get the printable images for the user and add them to the printable set
+         */
+        .then(function (images) {
+            console.log('Found ' + images.length + ' images');
         });
     }
 });
