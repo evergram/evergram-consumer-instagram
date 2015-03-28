@@ -5,6 +5,7 @@
 var q = require('q');
 var moment = require('moment');
 var common = require('evergram-common');
+var logger = common.utils.logger;
 var aws = common.aws;
 var config = require('../config');
 var instagram = common.instagram;
@@ -39,7 +40,6 @@ Consumer.prototype.consume = function () {
              */
             User.findOne({'_id': id}, function (err, user) {
                 if (user != null) {
-                    var userImages = [];
                     var userPrintableImageSet;
                     var dateRun = new Date();
 
@@ -54,7 +54,8 @@ Consumer.prototype.consume = function () {
                             userPrintableImageSet = printableImageSet;
                         }
 
-                        console.log('Getting printable images for:', user.instagram.username);
+                        logger.info('Getting printable images for: ' + user.instagram.username);
+
                         /**
                          * If we are a new user we won't put any date restrictions on the query
                          */
@@ -63,31 +64,44 @@ Consumer.prototype.consume = function () {
                         } else {
                             return instagram.manager.findPrintableImagesByUser(user, userPrintableImageSet.date);
                         }
-                    }, resolve)
+                    }, function (err) {
+                        logger.error('There was an error when finding printable image set for ' + user.instagram.username, err);
+
+                        resolve();
+                    })
                     /**
                      * Get the printable images for the user and add them to the printable set
                      */
                     .then(function (images) {
-                        console.log('Found ' + images.length + ' images for:', user.instagram.username);
+                        logger.info('Found ' + images.length + ' images for: ' + user.instagram.username);
 
                         //add the new images
                         userPrintableImageSet.addImages('instagram', images);
                         //save to db
                         return print.manager.save(userPrintableImageSet);
-                    }, resolve)
+                    }, function (err) {
+                        logger.error('There was an error when finding images for ' + user.instagram.username, err);
+                        resolve();
+                    })
                     /**
-                    * Remove the message from the queue.
-                    */
+                     * Remove the message from the queue.
+                     */
                     .then(function (printableImageSet) {
-                        console.log('Saved images for: ', user.instagram.username);
+                        logger.info('Saved images for: ' + user.instagram.username);
+
                         return deleteMessageFromQueue(message);
-                    }, resolve)
+                    }, function (err) {
+                        logger.error('There was an error when deleting from the queue for ' + user.instagram.username, err);
+
+                        resolve();
+                    })
                     /**
-                    * Save the user with a new last run and in queue state.
-                    */
+                     * Save the user with a new last run and in queue state.
+                     */
                     .then(function () {
                         var nextRun = getNextRunDate(dateRun);
-                        console.log('Updating user ' + user.instagram.username + ' with next run on:', nextRun);
+                        logger.info('Updating user ' + user.instagram.username + ' with next run on: ' + nextRun);
+
                         user.jobs.instagram.lastRunOn = dateRun;
                         user.jobs.instagram.nextRunOn = nextRun;
                         user.jobs.instagram.inQueue = false;
@@ -98,11 +112,11 @@ Consumer.prototype.consume = function () {
                 }
             });
         } else {
-            console.log('No messages on queue');
+            logger.info('No messages on queue');
             resolve();
         }
     }, function (err) {
-        console.log('No messages on queue');
+        logger.info('No messages on queue');
         /**
          * No messages or error, so just resolve and we'll check again
          */
