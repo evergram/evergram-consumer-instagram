@@ -8,7 +8,7 @@ var moment = require('moment');
 var config = require('../config');
 var common = require('evergram-common');
 var logger = common.utils.logger;
-var aws = common.aws;
+var sqs = common.aws.sqs;
 var instagramManager = common.instagram.manager;
 var printManager = common.print.manager;
 var userManager = common.user.manager;
@@ -31,7 +31,8 @@ Consumer.prototype.consume = function () {
     /**
      * Query SQS to get a message
      */
-    aws.sqs.getMessage(aws.sqs.QUEUES.INSTAGRAM, {WaitTimeSeconds: config.sqs.waitTime}).then(function (results) {
+    sqs.getMessage(sqs.QUEUES.INSTAGRAM, {WaitTimeSeconds: config.sqs.waitTime}).
+    then(function (results) {
         if (!!results[0].Body && !!results[0].Body.id) {
             var message = results[0];
             var id = message.Body.id;
@@ -46,22 +47,23 @@ Consumer.prototype.consume = function () {
                     /**
                      * process any previous image sets that haven't been closed out
                      */
-                    this.processReadyForPrintImageSet(user).then((function () {
+                    this.processReadyForPrintImageSet(user).
+                    then((function () {
                         /**
                          * process the current images
                          */
                         return this.processCurrentImageSet(user);
-                    }).bind(this))
+                    }).bind(this)).
                     /**
                      * Delete the message from the queue
                      */
-                    .then(function () {
+                    then(function () {
                         return deleteMessageFromQueue(results[0]);
-                    })
+                    }).
                     /**
                      * Save the user with a new last run and in queue state.
                      */
-                    .then(function () {
+                    then(function () {
                         var nextRun = getNextRunDate(dateRun);
                         logger.info('Updating user ' + user.getUsername() + ' with next run on: ' + nextRun);
 
@@ -93,8 +95,8 @@ Consumer.prototype.consume = function () {
  * This is the current period image set
  */
 Consumer.prototype.processCurrentImageSet = function (user) {
-    return printManager.findCurrentByUser(user)
-    .then((function (imageSet) {
+    return printManager.findCurrentByUser(user).
+    then((function (imageSet) {
         if (imageSet == null) {
             imageSet = printManager.getNewPrintableImageSet(user);
         }
@@ -115,8 +117,8 @@ Consumer.prototype.processReadyForPrintImageSet = function (user) {
 
     var numberOfPeriods = user.getCurrentPeriod();
     if (numberOfPeriods > 0) {
-        printManager.findAllPreviousNotReadyForPrintByUser(user)
-        .then((function (imageSets) {
+        printManager.findAllPreviousNotReadyForPrintByUser(user).
+        then((function (imageSets) {
             var imageDeferreds = [];
 
             if (!!imageSets && imageSets.length > 0) {
@@ -131,12 +133,14 @@ Consumer.prototype.processReadyForPrintImageSet = function (user) {
                     imageDeferreds.push(imageDeferred.promise);
 
                     imageSet.isReadyForPrint = true;
-                    this.processPrintableImageSet(user, imageSet).then(function () {
+                    this.processPrintableImageSet(user, imageSet).
+                    then(function () {
                         imageDeferred.resolve();
                     });
                 }).bind(this));
 
-                q.all(imageDeferreds).then(deferred.resolve);
+                q.all(imageDeferreds).
+                then(deferred.resolve);
             } else {
                 //TODO remove this once we no longer have legacy
                 var imageDeferred = q.defer();
@@ -151,7 +155,8 @@ Consumer.prototype.processReadyForPrintImageSet = function (user) {
                     if (!imageSets || imageSets.length == 0) {
                         var imageSet = printManager.getNewPrintableImageSet(user, numberOfPeriods - 1);
                         imageSet.isReadyForPrint = true;
-                        this.processPrintableImageSet(user, imageSet).then(function () {
+                        this.processPrintableImageSet(user, imageSet).
+                        then(function () {
                             imageDeferred.resolve();
                         });
                     } else {
@@ -160,7 +165,8 @@ Consumer.prototype.processReadyForPrintImageSet = function (user) {
                 }).bind(this));
             }
 
-            q.all(imageDeferreds).then(function () {
+            q.all(imageDeferreds).
+            then(function () {
                 logger.info('Completed getting previous ready for print sets for ' + user.getUsername());
 
                 deferred.resolve();
@@ -198,11 +204,11 @@ Consumer.prototype.processPrintableImageSet = function (user, printableImageSet)
         .findPrintableImagesByUser(user, printableImageSet.startDate, printableImageSet.endDate);
     }
 
-    return printableImagesPromise
+    return printableImagesPromise.
     /**
      * Get the printable images for the user and add them to the printable set
      */
-    .then(function (images) {
+    then(function (images) {
         logger.info('Found ' + images.length + ' images for ' + user.getUsername());
 
         /**
@@ -237,7 +243,7 @@ function getNextRunDate(dateRun) {
  * @returns {*}
  */
 function deleteMessageFromQueue(result) {
-    return aws.sqs.deleteMessage(aws.sqs.QUEUES.INSTAGRAM, result);
+    return sqs.deleteMessage(sqs.QUEUES.INSTAGRAM, result);
 }
 
 /**
