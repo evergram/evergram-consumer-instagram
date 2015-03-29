@@ -38,7 +38,7 @@ Consumer.prototype.consume = function () {
             var id = message.Body.id;
 
             var deleteMessageAndResolve = function () {
-                deleteMessageFromQueue(results[0]).then(resolve);
+                deleteMessageFromQueue(message).then(resolve);
             };
 
             /**
