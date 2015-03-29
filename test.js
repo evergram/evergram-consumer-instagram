@@ -13,7 +13,7 @@ var consumer = require('./app/consumer');
 //init db
 common.db.connect();
 
-var username = 'obrien.kimberley.a';
+var username = 'smetski';
 //var options = {criteria: {'instagram.username': username}};
 var options = {};
 
@@ -22,7 +22,13 @@ userManager.findAll(options).then(function (users) {
         if (user) {
             console.log('Found: ', user.getUsername());
 
-            consumer.processReadyForPrintImageSet(user);
+            consumer.processReadyForPrintImageSet(user).then(function () {
+                consumer.processCurrentImageSet(user).then(function () {
+                    console.log('DONE', user.getUsername());
+                }, function(err){
+                    console.log(err);
+                });
+            });
         }
     });
 });

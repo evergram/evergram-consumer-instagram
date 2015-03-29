@@ -8,7 +8,7 @@ var moment = require('moment');
 var config = require('../config');
 var common = require('evergram-common');
 var logger = common.utils.logger;
-var aws = common.aws;
+var sqs = common.aws.sqs;
 var instagramManager = common.instagram.manager;
 var printManager = common.print.manager;
 var userManager = common.user.manager;
@@ -31,10 +31,15 @@ Consumer.prototype.consume = function () {
     /**
      * Query SQS to get a message
      */
-    aws.sqs.getMessage(aws.sqs.QUEUES.INSTAGRAM, {WaitTimeSeconds: config.sqs.waitTime}).then(function (results) {
+    sqs.getMessage(sqs.QUEUES.INSTAGRAM, {WaitTimeSeconds: config.sqs.waitTime}).
+    then((function (results) {
         if (!!results[0].Body && !!results[0].Body.id) {
             var message = results[0];
             var id = message.Body.id;
+
+            var deleteMessageAndResolve = function () {
+                deleteMessageFromQueue(message).then(resolve);
+            };
 
             /**
              * Find the user
@@ -46,39 +51,38 @@ Consumer.prototype.consume = function () {
                     /**
                      * process any previous image sets that haven't been closed out
                      */
-                    this.processReadyForPrintImageSet(user).then((function () {
+                    logger.info('Starting previous images ready for print for ' + user.getUsername());
+
+                    this.processReadyForPrintImageSet(user).
+                    then((function () {
                         /**
                          * process the current images
                          */
+                        logger.info('Starting current images for ' + user.getUsername());
+
                         return this.processCurrentImageSet(user);
-                    }).bind(this))
-                    /**
-                     * Delete the message from the queue
-                     */
-                    .then(function () {
-                        return deleteMessageFromQueue(results[0]);
-                    })
+                    }).bind(this)).
                     /**
                      * Save the user with a new last run and in queue state.
                      */
-                    .then(function () {
+                    then(function () {
                         var nextRun = getNextRunDate(dateRun);
                         logger.info('Updating user ' + user.getUsername() + ' with next run on: ' + nextRun);
 
                         user.jobs.instagram.lastRunOn = dateRun;
                         user.jobs.instagram.nextRunOn = nextRun;
                         user.jobs.instagram.inQueue = false;
-                        user.save(resolve);
-                    }, resolve);
+                        user.save(deleteMessageAndResolve);
+                    }, deleteMessageAndResolve);
                 } else {
-                    deleteMessageFromQueue(results[0]).then(resolve);
+                    deleteMessageAndResolve();
                 }
             }).bind(this));
         } else {
             logger.info('No messages on queue');
             resolve();
         }
-    }, function (err) {
+    }).bind(this), function (err) {
         logger.info('No messages on queue');
         /**
          * No messages or error, so just resolve and we'll check again
@@ -93,9 +97,9 @@ Consumer.prototype.consume = function () {
  * This is the current period image set
  */
 Consumer.prototype.processCurrentImageSet = function (user) {
-    return printManager.findCurrentByUser(user)
-    .then((function (imageSet) {
-        if (imageSet == null) {
+    return printManager.findCurrentByUser(user).
+    then((function (imageSet) {
+        if (!imageSet) {
             imageSet = printManager.getNewPrintableImageSet(user);
         }
         logger.info('Getting current printable images for ' + user.getUsername());
@@ -114,12 +118,14 @@ Consumer.prototype.processReadyForPrintImageSet = function (user) {
     var deferred = q.defer();
 
     var numberOfPeriods = user.getCurrentPeriod();
-    if (numberOfPeriods > 0) {
-        printManager.findAllPreviousNotReadyForPrintByUser(user)
-        .then((function (imageSets) {
-            var imageDeferreds = [];
+    logger.info(user.getUsername() + ' is in period ' + numberOfPeriods);
 
+    if (numberOfPeriods > 0) {
+        printManager.findAllPreviousNotReadyForPrintByUser(user).
+        then((function (imageSets) {
             if (!!imageSets && imageSets.length > 0) {
+                var imageSetDeferreds = [];
+
                 logger.info('Getting previous ready for print images for ' + user.getUsername());
 
                 /**
@@ -127,21 +133,22 @@ Consumer.prototype.processReadyForPrintImageSet = function (user) {
                  * and then set ready for print.
                  */
                 _.forEach(imageSets, (function (imageSet) {
-                    var imageDeferred = q.defer();
-                    imageDeferreds.push(imageDeferred.promise);
-
+                    var imageSetDeferred = q.defer();
+                    imageSetDeferreds.push(imageSetDeferred.promise);
                     imageSet.isReadyForPrint = true;
-                    this.processPrintableImageSet(user, imageSet).then(function () {
-                        imageDeferred.resolve();
+                    this.processPrintableImageSet(user, imageSet).
+                    then(function () {
+                        imageSetDeferred.resolve();
+                    }, function (err) {
+                        logger.error(err);
+                        imageSetDeferred.resolve();
                     });
                 }).bind(this));
 
-                q.all(imageDeferreds).then(deferred.resolve);
+                q.all(imageSetDeferreds).
+                then(deferred.resolve);
             } else {
                 //TODO remove this once we no longer have legacy
-                var imageDeferred = q.defer();
-                imageDeferreds.push(imageDeferred.promise);
-
                 /**
                  * Check to see if this is the first time.
                  */
@@ -151,20 +158,23 @@ Consumer.prototype.processReadyForPrintImageSet = function (user) {
                     if (!imageSets || imageSets.length == 0) {
                         var imageSet = printManager.getNewPrintableImageSet(user, numberOfPeriods - 1);
                         imageSet.isReadyForPrint = true;
-                        this.processPrintableImageSet(user, imageSet).then(function () {
-                            imageDeferred.resolve();
+
+                        this.processPrintableImageSet(user, imageSet).
+                        then(function () {
+                            deferred.resolve();
+                        }, function (err) {
+                            logger.error(err);
+                            deferred.resolve();
                         });
                     } else {
-                        imageDeferred.resolve();
+                        logger.info('There are no missing image sets for ' + user.getUsername());
+                        deferred.resolve();
                     }
-                }).bind(this));
+                }).bind(this), function (err) {
+                    logger.error(err);
+                    deferred.resolve();
+                });
             }
-
-            q.all(imageDeferreds).then(function () {
-                logger.info('Completed getting previous ready for print sets for ' + user.getUsername());
-
-                deferred.resolve();
-            });
         }).bind(this));
     } else {
         deferred.resolve();
@@ -187,7 +197,7 @@ Consumer.prototype.processPrintableImageSet = function (user, printableImageSet)
      * If we are a new user we won't put any date restrictions on the query
      */
     if (user.isInFirstPeriod()) {
-        logger.into('Running ' + user.getUsername() + ' from the beginning of time to ' + printableImageSet.endDate);
+        logger.info('Running ' + user.getUsername() + ' from the beginning of time to ' + printableImageSet.endDate);
 
         printableImagesPromise = instagramManager
         .findPrintableImagesByUser(user, null, printableImageSet.endDate);
@@ -198,17 +208,19 @@ Consumer.prototype.processPrintableImageSet = function (user, printableImageSet)
         .findPrintableImagesByUser(user, printableImageSet.startDate, printableImageSet.endDate);
     }
 
-    return printableImagesPromise
+    return printableImagesPromise.
     /**
      * Get the printable images for the user and add them to the printable set
      */
-    .then(function (images) {
+    then(function (images) {
         logger.info('Found ' + images.length + ' images for ' + user.getUsername());
 
         /**
          * Add the new images.
          */
         printableImageSet.addImages('instagram', images);
+
+        logger.info('Saving image set ' + printableImageSet._id + ' for ' + user.getUsername());
 
         /**
          * Save to db.
@@ -237,7 +249,7 @@ function getNextRunDate(dateRun) {
  * @returns {*}
  */
 function deleteMessageFromQueue(result) {
-    return aws.sqs.deleteMessage(aws.sqs.QUEUES.INSTAGRAM, result);
+    return sqs.deleteMessage(sqs.QUEUES.INSTAGRAM, result);
 }
 
 /**
