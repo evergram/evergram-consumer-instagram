@@ -63,7 +63,7 @@ Consumer.prototype.consume = function () {
                      */
                     .then(function () {
                         var nextRun = getNextRunDate(dateRun);
-                        logger.info('Updating user ' + user.instagram.username + ' with next run on: ' + nextRun);
+                        logger.info('Updating user ' + user.getUsername() + ' with next run on: ' + nextRun);
 
                         user.jobs.instagram.lastRunOn = dateRun;
                         user.jobs.instagram.nextRunOn = nextRun;
@@ -94,15 +94,14 @@ Consumer.prototype.consume = function () {
  */
 Consumer.prototype.processCurrentImageSet = function (user) {
     return printManager.findCurrentByUser(user)
-    .then(function (printableImageSet) {
-        if (printableImageSet == null) {
-            printableImageSet = printManager.getNewPrintableImageSet(user);
+    .then((function (imageSet) {
+        if (imageSet == null) {
+            imageSet = printManager.getNewPrintableImageSet(user);
         }
+        logger.info('Getting current printable images for ' + user.getUsername());
 
-        logger.info('Getting current printable images for: ' + user.instagram.username);
-
-        return processPrintableImageSet(user, printableImageSet);
-    });
+        return this.processPrintableImageSet(user, imageSet);
+    }).bind(this));
 }
 
 /**
@@ -121,7 +120,7 @@ Consumer.prototype.processReadyForPrintImageSet = function (user) {
             var imageDeferreds = [];
 
             if (!!imageSets && imageSets.length > 0) {
-                logger.info('Getting previous ready for print images for: ' + user.instagram.username);
+                logger.info('Getting previous ready for print images for ' + user.getUsername());
 
                 /**
                  * We do one final fetch on images to make sure we haven't missed any
@@ -139,45 +138,33 @@ Consumer.prototype.processReadyForPrintImageSet = function (user) {
 
                 q.all(imageDeferreds).then(deferred.resolve);
             } else {
+                //TODO remove this once we no longer have legacy
+                var imageDeferred = q.defer();
+                imageDeferreds.push(imageDeferred.promise);
+
                 /**
-                 * We get all previous sets to find the ones that are missing.
+                 * Check to see if this is the first time.
                  */
-                var printedImageSets = printManager.findAllPrintedByUser(user)
-                .then((function (imageSets) {
-                    logger.info('Backfilling print images for: ' + user.instagram.username);
+                printManager.findAllByUser(user).then((function (imageSets) {
+                    logger.info('Getting previous period for ' + user.getUsername());
 
-                    /**
-                     * Check to see if each period is already printed.
-                     * If not, it is missing and we will create a new set.
-                     */
-                    _.forEach(new Array(numberOfPeriods), (function (el, i) {
-                        if (imageSets.length == 0 || !printableImageSetsContainPeriod(user, imageSets, i)) {
-                            var imageDeferred = q.defer();
-                            imageDeferreds.push(imageDeferred.promise);
-
-                            var imageSet = printManager.getNewPrintableImageSet(user, i);
-                            imageSet.isReadyForPrint = true;
-                            /**
-                             * If it's not last months, we will assume it's already printed.
-                             */
-                            if (isPreviousPrintableImageSet(user, imageSet)) {
-                                imageSet.isPrinted = false;
-                            } else {
-                                imageSet.isPrinted = true;
-                            }
-                            this.processPrintableImageSet(user, imageSet).then(function () {
-                                imageDeferred.resolve();
-                            });
-                        }
-                    }).bind(this));
-
-                    q.all(imageDeferreds).then(function () {
-                        logger.info("Completed ready for print");
-
-                        deferred.resolve();
-                    });
+                    if (!imageSets || imageSets.length == 0) {
+                        var imageSet = printManager.getNewPrintableImageSet(user, numberOfPeriods - 1);
+                        imageSet.isReadyForPrint = true;
+                        this.processPrintableImageSet(user, imageSet).then(function () {
+                            imageDeferred.resolve();
+                        });
+                    } else {
+                        imageDeferred.resolve();
+                    }
                 }).bind(this));
             }
+
+            q.all(imageDeferreds).then(function () {
+                logger.info('Completed getting previous ready for print sets for ' + user.getUsername());
+
+                deferred.resolve();
+            });
         }).bind(this));
     } else {
         deferred.resolve();
@@ -200,9 +187,13 @@ Consumer.prototype.processPrintableImageSet = function (user, printableImageSet)
      * If we are a new user we won't put any date restrictions on the query
      */
     if (user.isInFirstPeriod()) {
+        logger.into('Running ' + user.getUsername() + ' from the beginning of time to ' + printableImageSet.endDate);
+
         printableImagesPromise = instagramManager
         .findPrintableImagesByUser(user, null, printableImageSet.endDate);
     } else {
+        logger.info('Running ' + user.getUsername() + ' from ' + printableImageSet.startDate + ' to ' + printableImageSet.endDate);
+
         printableImagesPromise = instagramManager
         .findPrintableImagesByUser(user, printableImageSet.startDate, printableImageSet.endDate);
     }
@@ -212,7 +203,7 @@ Consumer.prototype.processPrintableImageSet = function (user, printableImageSet)
      * Get the printable images for the user and add them to the printable set
      */
     .then(function (images) {
-        logger.info('Found ' + images.length + ' images for: ' + user.instagram.username);
+        logger.info('Found ' + images.length + ' images for ' + user.getUsername());
 
         /**
          * Add the new images.
@@ -224,32 +215,10 @@ Consumer.prototype.processPrintableImageSet = function (user, printableImageSet)
          */
         return printManager.save(printableImageSet);
     }, function (err) {
-        logger.error('There was an error when finding images for ' + user.instagram.username, err);
+        logger.error('There was an error when finding images for ' + user.getUsername(), err);
         resolve();
     })
 };
-
-/**
- * Is the passed image set date the same as the previous user date
- * @param user
- * @param imageSet
- * @returns {*}
- */
-function isPreviousPrintableImageSet(user, imageSet) {
-    return moment(imageSet.startDate).isSame(user.getPreviousPeriodStartDate(1));
-}
-
-/**
- *
- * @param imageSets
- * @param period
- * @returns {boolean}
- */
-function printableImageSetsContainPeriod(user, imageSets, period) {
-    return _.some(imageSets, function (imgSet) {
-        return user.getPeriodFromStartDate(imgSet.startDate) == period;
-    });
-}
 
 /**
  * Gets the next run date based on the date the process was run.
