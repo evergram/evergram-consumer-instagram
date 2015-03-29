@@ -32,10 +32,14 @@ Consumer.prototype.consume = function () {
      * Query SQS to get a message
      */
     sqs.getMessage(sqs.QUEUES.INSTAGRAM, {WaitTimeSeconds: config.sqs.waitTime}).
-    then(function (results) {
+    then((function (results) {
         if (!!results[0].Body && !!results[0].Body.id) {
             var message = results[0];
             var id = message.Body.id;
+
+            var deleteMessageAndResolve = function () {
+                deleteMessageFromQueue(results[0]).then(resolve);
+            };
 
             /**
              * Find the user
@@ -47,19 +51,17 @@ Consumer.prototype.consume = function () {
                     /**
                      * process any previous image sets that haven't been closed out
                      */
+                    logger.info('Starting previous images ready for print for ' + user.getUsername());
+
                     this.processReadyForPrintImageSet(user).
                     then((function () {
                         /**
                          * process the current images
                          */
+                        logger.info('Starting current images for ' + user.getUsername());
+
                         return this.processCurrentImageSet(user);
                     }).bind(this)).
-                    /**
-                     * Delete the message from the queue
-                     */
-                    then(function () {
-                        return deleteMessageFromQueue(results[0]);
-                    }).
                     /**
                      * Save the user with a new last run and in queue state.
                      */
@@ -70,17 +72,17 @@ Consumer.prototype.consume = function () {
                         user.jobs.instagram.lastRunOn = dateRun;
                         user.jobs.instagram.nextRunOn = nextRun;
                         user.jobs.instagram.inQueue = false;
-                        user.save(resolve);
-                    }, resolve);
+                        user.save(deleteMessageAndResolve);
+                    }, deleteMessageAndResolve);
                 } else {
-                    deleteMessageFromQueue(results[0]).then(resolve);
+                    deleteMessageAndResolve();
                 }
             }).bind(this));
         } else {
             logger.info('No messages on queue');
             resolve();
         }
-    }, function (err) {
+    }).bind(this), function (err) {
         logger.info('No messages on queue');
         /**
          * No messages or error, so just resolve and we'll check again
@@ -97,7 +99,7 @@ Consumer.prototype.consume = function () {
 Consumer.prototype.processCurrentImageSet = function (user) {
     return printManager.findCurrentByUser(user).
     then((function (imageSet) {
-        if (imageSet == null) {
+        if (!imageSet) {
             imageSet = printManager.getNewPrintableImageSet(user);
         }
         logger.info('Getting current printable images for ' + user.getUsername());
@@ -116,12 +118,14 @@ Consumer.prototype.processReadyForPrintImageSet = function (user) {
     var deferred = q.defer();
 
     var numberOfPeriods = user.getCurrentPeriod();
+    logger.info(user.getUsername() + ' is in period ' + numberOfPeriods);
+
     if (numberOfPeriods > 0) {
         printManager.findAllPreviousNotReadyForPrintByUser(user).
         then((function (imageSets) {
-            var imageDeferreds = [];
-
             if (!!imageSets && imageSets.length > 0) {
+                var imageSetDeferreds = [];
+
                 logger.info('Getting previous ready for print images for ' + user.getUsername());
 
                 /**
@@ -129,23 +133,22 @@ Consumer.prototype.processReadyForPrintImageSet = function (user) {
                  * and then set ready for print.
                  */
                 _.forEach(imageSets, (function (imageSet) {
-                    var imageDeferred = q.defer();
-                    imageDeferreds.push(imageDeferred.promise);
-
+                    var imageSetDeferred = q.defer();
+                    imageSetDeferreds.push(imageSetDeferred.promise);
                     imageSet.isReadyForPrint = true;
                     this.processPrintableImageSet(user, imageSet).
                     then(function () {
-                        imageDeferred.resolve();
+                        imageSetDeferred.resolve();
+                    }, function (err) {
+                        logger.error(err);
+                        imageSetDeferred.resolve();
                     });
                 }).bind(this));
 
-                q.all(imageDeferreds).
+                q.all(imageSetDeferreds).
                 then(deferred.resolve);
             } else {
                 //TODO remove this once we no longer have legacy
-                var imageDeferred = q.defer();
-                imageDeferreds.push(imageDeferred.promise);
-
                 /**
                  * Check to see if this is the first time.
                  */
@@ -155,22 +158,23 @@ Consumer.prototype.processReadyForPrintImageSet = function (user) {
                     if (!imageSets || imageSets.length == 0) {
                         var imageSet = printManager.getNewPrintableImageSet(user, numberOfPeriods - 1);
                         imageSet.isReadyForPrint = true;
+
                         this.processPrintableImageSet(user, imageSet).
                         then(function () {
-                            imageDeferred.resolve();
+                            deferred.resolve();
+                        }, function (err) {
+                            logger.error(err);
+                            deferred.resolve();
                         });
                     } else {
-                        imageDeferred.resolve();
+                        logger.info('There are no missing image sets for ' + user.getUsername());
+                        deferred.resolve();
                     }
-                }).bind(this));
+                }).bind(this), function (err) {
+                    logger.error(err);
+                    deferred.resolve();
+                });
             }
-
-            q.all(imageDeferreds).
-            then(function () {
-                logger.info('Completed getting previous ready for print sets for ' + user.getUsername());
-
-                deferred.resolve();
-            });
         }).bind(this));
     } else {
         deferred.resolve();
@@ -193,7 +197,7 @@ Consumer.prototype.processPrintableImageSet = function (user, printableImageSet)
      * If we are a new user we won't put any date restrictions on the query
      */
     if (user.isInFirstPeriod()) {
-        logger.into('Running ' + user.getUsername() + ' from the beginning of time to ' + printableImageSet.endDate);
+        logger.info('Running ' + user.getUsername() + ' from the beginning of time to ' + printableImageSet.endDate);
 
         printableImagesPromise = instagramManager
         .findPrintableImagesByUser(user, null, printableImageSet.endDate);
@@ -215,6 +219,8 @@ Consumer.prototype.processPrintableImageSet = function (user, printableImageSet)
          * Add the new images.
          */
         printableImageSet.addImages('instagram', images);
+
+        logger.info('Saving image set ' + printableImageSet._id + ' for ' + user.getUsername());
 
         /**
          * Save to db.
