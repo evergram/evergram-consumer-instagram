@@ -5,7 +5,7 @@
 module.exports = {
     userNextRunDelay: 600, //seconds
     sqs: {
-        waitTime: 0 //seconds
+        waitTime: 1 //seconds
     },
     retryWaitTime: 1 //seconds
 };
