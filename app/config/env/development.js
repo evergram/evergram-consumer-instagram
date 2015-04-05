@@ -3,7 +3,7 @@
  */
 
 module.exports = {
-    userNextRunDelay: 1, //seconds
+    userNextRunDelay: 600, //seconds
     sqs: {
         waitTime: 0 //seconds
     },
