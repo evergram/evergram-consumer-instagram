@@ -11,13 +11,20 @@ var consumer = require('./consumer');
 common.db.connect();
 
 function run() {
-    logger.info('-------------------------------------------------------------------');
     logger.info('Checking Instagram queue');
-    consumer.consume().then(function () {
-        logger.info('Completed checking Instagram queue');
-        setTimeout(run, config.retryWaitTime * 1000);
-        logger.info('Waiting ' + config.retryWaitTime + ' seconds before next check');
-    });
+    try {
+        consumer.consume().then(function () {
+            logger.info('Completed checking Instagram queue');
+            logger.info('Waiting ' + config.retryWaitTime + ' seconds before next check');
+            setTimeout(run, config.retryWaitTime * 1000);
+        }).fail(function (err) {
+            logger.info(err);
+            logger.info('Waiting ' + config.retryWaitTime + ' seconds before next check');
+            setTimeout(run, config.retryWaitTime * 1000);
+        }).done();
+    } catch (err) {
+        logger.error(err);
+    }
 }
 
 //kick off the process
