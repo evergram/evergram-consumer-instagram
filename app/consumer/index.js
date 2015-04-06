@@ -12,6 +12,7 @@ var sqs = common.aws.sqs;
 var instagramManager = common.instagram.manager;
 var printManager = common.print.manager;
 var userManager = common.user.manager;
+var trackingManager = require('../tracking');
 
 /**
  * A consumer that handles all of the consumers
@@ -214,6 +215,13 @@ Consumer.prototype.processPrintableImageSet = function (user, printableImageSet)
      */
     then(function (images) {
         logger.info('Found ' + images.length + ' images for ' + user.getUsername());
+
+        /**
+         * Track the images
+         */
+        if(images.length > 0) {
+            trackingManager.trackTaggedImages(user, printableImageSet, images);
+        }
 
         /**
          * Add the new images.
