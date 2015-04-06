@@ -219,7 +219,9 @@ Consumer.prototype.processPrintableImageSet = function (user, printableImageSet)
         /**
          * Track the images
          */
-        trackingManager.trackTaggedImages(user, printableImageSet, images);
+        if(images.length > 0) {
+            trackingManager.trackTaggedImages(user, printableImageSet, images);
+        }
 
         /**
          * Add the new images.

@@ -16,6 +16,13 @@ function TrackingManager() {
 
 }
 
+/**
+ * Tracks tagged images.
+ *
+ * @param user
+ * @param imageSet
+ * @param images
+ */
 TrackingManager.prototype.trackTaggedImages = function (user, imageSet, images) {
     var event = 'Tagged Instagram Images';
     var total = 0;
@@ -33,15 +40,30 @@ TrackingManager.prototype.trackTaggedImages = function (user, imageSet, images) 
         }
     });
 
-    logger.info('Tracking ' + event + ' for ' + user.getUsername());
+    if (total > 0) {
+        logger.info('Tracking ' + event + ' for ' + user.getUsername());
 
-    return trackingManager.trackEvent(user, event, {
-        'Instagram Username': user.instagram.username,
-        'User Period': user.getPeriodFromStartDate(imageSet.startDate),
-        'Total Images Tagged': total,
-        'Total Owned Images Tagged': owned,
-        'Total Other Images Tagged': other
-    });
+        return trackingManager.incrementMultiple(user, {
+            'Total Images Tagged': total,
+            'Total Own Images Tagged': owned,
+            'Total Other Images Tagged': other
+        }).then(function () {
+            return trackingManager.trackEvent(user, event, {
+                'Instagram Username': user.instagram.username,
+                'Period': user.getPeriodFromStartDate(imageSet.startDate),
+                'Country': imageSet.user.address.country,
+                'State': imageSet.user.address.state,
+                'City': imageSet.user.address.suburb,
+                'Image Set Start Date': imageSet.startDate,
+                'Image Set End Date': imageSet.endDate,
+                'Total Images Tagged': total,
+                'Total Own Images Tagged': owned,
+                'Total Other Images Tagged': other
+            });
+        });
+    } else {
+        return;
+    }
 };
 
 /**
