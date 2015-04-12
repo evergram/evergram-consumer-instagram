@@ -24,7 +24,7 @@ function TrackingManager() {
  * @param images
  */
 TrackingManager.prototype.trackTaggedImages = function (user, imageSet, images) {
-    var event = 'Tagged Instagram Images';
+    var event = 'Tagged Images';
     var total = 0;
     var owned = 0;
     var other = 0;
@@ -49,6 +49,8 @@ TrackingManager.prototype.trackTaggedImages = function (user, imageSet, images) 
             'Total Other Images Tagged': other
         }).then(function () {
             return trackingManager.trackEvent(user, event, {
+                'Service': 'Instagram',
+                'Plan': user.billing.option,
                 'Instagram Username': user.instagram.username,
                 'Period': user.getPeriodFromStartDate(imageSet.startDate),
                 'Country': imageSet.user.address.country,

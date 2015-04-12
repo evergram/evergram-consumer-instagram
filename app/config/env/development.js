@@ -7,5 +7,6 @@ module.exports = {
     sqs: {
         waitTime: 1 //seconds
     },
-    retryWaitTime: 1 //seconds
+    retryWaitTime: 1, //seconds
+    track: false
 };
