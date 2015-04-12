@@ -28,6 +28,9 @@ Consumer.prototype.consume = function () {
     var resolve = function () {
         deferred.resolve();
     };
+    var failed = function (err) {
+        deferred.reject(err);
+    };
 
     /**
      * Query SQS to get a message
@@ -40,6 +43,11 @@ Consumer.prototype.consume = function () {
 
             var deleteMessageAndResolve = function () {
                 deleteMessageFromQueue(message).then(resolve);
+            };
+            var deleteMessageAndFail = function (err) {
+                deleteMessageFromQueue(message).then(function () {
+                    failed(err);
+                });
             };
 
             /**
@@ -73,23 +81,27 @@ Consumer.prototype.consume = function () {
                         user.jobs.instagram.lastRunOn = dateRun;
                         user.jobs.instagram.nextRunOn = nextRun;
                         user.jobs.instagram.inQueue = false;
-                        user.save(deleteMessageAndResolve);
-                    }, deleteMessageAndResolve);
+
+                        userManager.update(user).
+                        then(deleteMessageAndResolve).
+                        fail(deleteMessageAndFail).
+                        done();
+                    }, deleteMessageAndResolve).
+                    fail(deleteMessageAndFail).
+                    done();
                 } else {
                     deleteMessageAndResolve();
                 }
-            }).bind(this));
+            }).bind(this)).
+            fail(failed).
+            done();
         } else {
             logger.info('No messages on queue');
             resolve();
         }
-    }).bind(this), function (err) {
-        logger.info('No messages on queue');
-        /**
-         * No messages or error, so just resolve and we'll check again
-         */
-        resolve();
-    });
+    }).bind(this)).
+    fail(failed).
+    done();
 
     return deferred.promise;
 };
@@ -219,7 +231,7 @@ Consumer.prototype.processPrintableImageSet = function (user, printableImageSet)
         /**
          * Track the images
          */
-        if (images.length > 0 && !!config.track) {
+        if (images.length > 0 && (!!config.track && config.track !== 'false')) {
             trackingManager.trackTaggedImages(user, printableImageSet, images);
         }
 
