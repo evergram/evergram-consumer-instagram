@@ -152,10 +152,12 @@ Consumer.prototype.processReadyForPrintImageSet = function (user) {
                     this.processPrintableImageSet(user, imageSet).
                     then(function () {
                         imageSetDeferred.resolve();
-                    }, function (err) {
+                    }).
+                    fail(function (err) {
                         logger.error(err);
-                        imageSetDeferred.resolve();
-                    });
+                        imageSetDeferred.reject(err);
+                    }).
+                    done();
                 }).bind(this));
 
                 q.all(imageSetDeferreds).
@@ -175,20 +177,29 @@ Consumer.prototype.processReadyForPrintImageSet = function (user) {
                         this.processPrintableImageSet(user, imageSet).
                         then(function () {
                             deferred.resolve();
-                        }, function (err) {
+                        }).
+                        fail(function (err) {
                             logger.error(err);
-                            deferred.resolve();
-                        });
+                            deferred.reject(err);
+                        }).
+                        done();
                     } else {
                         logger.info('There are no missing image sets for ' + user.getUsername());
                         deferred.resolve();
                     }
-                }).bind(this), function (err) {
+                }).bind(this)).
+                fail(function (err) {
                     logger.error(err);
-                    deferred.resolve();
-                });
+                    deferred.reject(err);
+                }).
+                done();
             }
-        }).bind(this));
+        }).bind(this)).
+        fail(function (err) {
+            logger.error(err);
+            deferred.reject(err);
+        }).
+        done();
     } else {
         deferred.resolve();
     }
@@ -246,10 +257,7 @@ Consumer.prototype.processPrintableImageSet = function (user, printableImageSet)
          * Save to db.
          */
         return printManager.save(printableImageSet);
-    }, function (err) {
-        logger.error('There was an error when finding images for ' + user.getUsername(), err);
-        resolve();
-    })
+    });
 };
 
 /**
