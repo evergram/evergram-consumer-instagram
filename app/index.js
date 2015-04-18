@@ -3,8 +3,9 @@
  */
 
 var common = require('evergram-common');
+var newrelic = require('newrelic');
 var logger = common.utils.logger;
-var config = require('./config');
+var retryWaitTime = require('./config').retryWaitTime * 1000;
 var consumer = require('./consumer');
 
 //init db
@@ -13,16 +14,24 @@ common.db.connect();
 function run() {
     logger.info('Checking Instagram queue');
     try {
-        consumer.consume().then(function () {
+        consumer.consume().then(newrelic.createBackgroundTransaction('jobs:process-queue', function (message) {
+            newrelic.endTransaction();
+            if (!_.isEmpty(message)) {
+                logger.info(message);
+            }
             logger.info('Completed checking Instagram queue');
-            logger.info('Waiting ' + config.retryWaitTime + ' seconds before next check');
-            setTimeout(run, config.retryWaitTime * 1000);
-        }).fail(function (err) {
-            logger.info(err);
-            logger.info('Waiting ' + config.retryWaitTime + ' seconds before next check');
-            setTimeout(run, config.retryWaitTime * 1000);
+            logger.info('Waiting ' + (retryWaitTime / 1000) + ' seconds before next check');
+            setTimeout(run, retryWaitTime);
+        })).fail(function (err) {
+            newrelic.endTransaction();
+            if (!_.isEmpty(err)) {
+                logger.info(err);
+            }
+            logger.info('Waiting ' + (retryWaitTime / 1000) + ' seconds before next check');
+            setTimeout(run, retryWaitTime);
         }).done();
     } catch (err) {
+        setTimeout(run, retryWaitTime);
         logger.error(err);
     }
 }
