@@ -2,6 +2,7 @@
  * Module dependencies.
  */
 
+var _ = require('lodash');
 var common = require('evergram-common');
 var newrelic = require('newrelic');
 var logger = common.utils.logger;
@@ -25,7 +26,7 @@ function run() {
         })).fail(function (err) {
             newrelic.endTransaction();
             if (!_.isEmpty(err)) {
-                logger.info(err);
+                logger.error(err);
             }
             logger.info('Waiting ' + (retryWaitTime / 1000) + ' seconds before next check');
             setTimeout(run, retryWaitTime);
