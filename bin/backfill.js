@@ -33,6 +33,8 @@ userManager.findAll(options).then(function (users) {
             current++;
             if (current <= processUsers.length) {
                 process();
+            } else {
+                logger.info('Done processing all');
             }
         });
     };
@@ -105,15 +107,16 @@ function processImageSet(user, i) {
                         } else {
                             logger.info('Completed new image set for period ' + i + ' for ' + user.getUsername());
                         }
-                        deferred.resolve();
                     });
+                    deferred.resolve();
+                } else {
+                    deferred.resolve();
                 }
             }).
             fail(function (err) {
-                logger.error(err);
                 deferred.resolve();
-            }).
-            done();
+                logger.error(err);
+            });
         }
     }).
     fail(function (err) {
