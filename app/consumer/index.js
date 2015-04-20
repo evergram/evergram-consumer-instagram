@@ -220,7 +220,7 @@ Consumer.prototype.processPrintableImageSet = function (user, printableImageSet)
     /**
      * If we are a new user we won't put any date restrictions on the query
      */
-    if (user.isInFirstPeriod()) {
+    if (user.isInFirstPeriod() || printableImageSet.period === 0) {
         logger.info('Running ' + user.getUsername() + ' from the beginning of time to ' + printableImageSet.endDate);
 
         printableImagesPromise = instagramManager
