@@ -98,7 +98,7 @@ function processImageSet(user, i) {
 
             consumer.processPrintableImageSet(user, newImageSet).
             then(function () {
-                if (newImageSet.period != user.getCurrentPeriod()) {
+                if (newImageSet.period != user.getCurrentPeriod() && newImageSet.images.instagram.length > 0) {
                     newImageSet.isPrinted = true;
                     newImageSet.isReadyForPrint = true;
                     newImageSet.save(function (err) {
