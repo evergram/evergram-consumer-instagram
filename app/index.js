@@ -1,3 +1,4 @@
+'use strict';
 /**
  * Module dependencies.
  */
@@ -14,23 +15,29 @@ common.db.connect();
 
 function run() {
     logger.info('Checking Instagram queue');
+
     try {
-        consumer.consume().then(newrelic.createBackgroundTransaction('jobs:process-queue', function (message) {
-            newrelic.endTransaction();
-            if (!_.isEmpty(message)) {
-                logger.info(message);
-            }
-            logger.info('Completed checking Instagram queue');
-            logger.info('Waiting ' + (retryWaitTime / 1000) + ' seconds before next check');
-            setTimeout(run, retryWaitTime);
-        })).fail(function (err) {
-            newrelic.endTransaction();
-            if (!_.isEmpty(err)) {
-                logger.error(err);
-            }
-            logger.info('Waiting ' + (retryWaitTime / 1000) + ' seconds before next check');
-            setTimeout(run, retryWaitTime);
-        }).done();
+        consumer.consume().
+            then(newrelic.createBackgroundTransaction('jobs:process-queue', function(message) {
+                newrelic.endTransaction();
+                if (!_.isEmpty(message)) {
+                    logger.info(message);
+                }
+
+                logger.info('Completed checking Instagram queue');
+                logger.info('Waiting ' + (retryWaitTime / 1000) + ' seconds before next check');
+                setTimeout(run, retryWaitTime);
+            })).
+            fail(function(err) {
+                newrelic.endTransaction();
+                if (!_.isEmpty(err)) {
+                    logger.error(err);
+                }
+
+                logger.info('Waiting ' + (retryWaitTime / 1000) + ' seconds before next check');
+                setTimeout(run, retryWaitTime);
+            }).
+            done();
     } catch (err) {
         setTimeout(run, retryWaitTime);
         logger.error(err);

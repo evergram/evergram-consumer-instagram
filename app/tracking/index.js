@@ -1,3 +1,4 @@
+'use strict';
 /**
  * @author Josh Stuart <joshstuartx@gmail.com>.
  */
@@ -25,13 +26,13 @@ function TrackingManager() {
  * @param imageSet
  * @param images
  */
-TrackingManager.prototype.trackTaggedImages = function (user, imageSet, images) {
+TrackingManager.prototype.trackTaggedImages = function(user, imageSet, images) {
     var deferreds = [];
     var event = 'Tagged a photo';
 
     logger.info('Tracking ' + event + ' for ' + user.getUsername());
 
-    _.forEach(images, function (image) {
+    _.forEach(images, function(image) {
         if (!imageSet.containsImage('instagram', image)) {
             var deferred = trackingManager.trackEvent(user, event, {
                 service: 'instagram',
@@ -56,4 +57,4 @@ TrackingManager.prototype.trackTaggedImages = function (user, imageSet, images) 
  * Expose
  * @type {TrackingManagerService}
  */
-module.exports = exports = new TrackingManager;
+module.exports = exports = new TrackingManager();
