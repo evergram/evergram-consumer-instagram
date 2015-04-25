@@ -1,12 +1,17 @@
+'use strict';
 /**
  * Expose
  */
 
 module.exports = {
-    userNextRunDelay: 600, //seconds
+    //seconds
+    userNextRunDelay: 600,
     sqs: {
-        waitTime: 1 //seconds
+        //seconds
+        waitTime: 1
     },
-    retryWaitTime: 1, //seconds
+
+    //seconds
+    retryWaitTime: 10,
     track: false
 };

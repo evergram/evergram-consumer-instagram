@@ -18,7 +18,10 @@
   },
   "scripts": {
     "start": "NODE_ENV=development ./node_modules/.bin/nodemon server.js",
-    "test": "NODE_ENV=development ./node_modules/.bin/nodemon test.js"
+    "pretest": "npm run-script lint && npm run-script checkStyle",
+    "test": "./node_modules/.bin/istanbul cover ./node_modules/.bin/_mocha -- --recursive -R spec -r should",
+    "lint": "./node_modules/.bin/jshint ./app",
+    "checkStyle": "./node_modules/.bin/jscs ./app"
   },
   "dependencies": {
     "async": "0.9.0",
@@ -32,9 +35,11 @@
     "q": "^1.2.0"
   },
   "devDependencies": {
-    "supertest": "0.13.0",
-    "should": "4.0.4",
-    "mocha": "1.21.4",
-    "nodemon": "1.2.1"
+    "istanbul": "^0.3.13",
+    "jscs": "^1.12.0",
+    "jshint": "^2.7.0",
+    "mocha": "^2.2.4",
+    "should": "^6.0.1",
+    "sinon": "^1.14.1"
   }
 }

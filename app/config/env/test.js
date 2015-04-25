@@ -3,10 +3,14 @@
  */
 
 module.exports = {
-    userNextRunDelay: 60 * 60, //seconds, 1hr default
+    //seconds, 1hr default
+    userNextRunDelay: 60 * 60,
     sqs: {
-        waitTime: 20 //seconds
+        //seconds
+        waitTime: 20
     },
-    retryWaitTime: 60, //seconds
+
+    //seconds
+    retryWaitTime: 60,
     track: false
 };
