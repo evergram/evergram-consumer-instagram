@@ -187,6 +187,8 @@ function processCurrentImageSet(user) {
         });
 }
 
+Consumer.prototype.processCurrentImageSet = processCurrentImageSet;
+
 /**
  * These are image sets that are past their period, but have not
  * yet been marked as "ready for print"
@@ -199,10 +201,15 @@ function processReadyForPrintImageSet(user) {
     if (numberOfPeriods > 0) {
         logger.info('Checking previous ready for print images for ' + user.getUsername());
 
-        return printManager.findPreviousByUser(user, numberOfPeriods).
+        return printManager.findPreviousByUser(user).
             then(function(imageSet) {
                 if (!!imageSet && !imageSet.isReadyForPrint) {
-                    return processPrintableImageSet(user, imageSet);
+                    return processPrintableImageSet(user, imageSet).then(function() {
+                        //save the image set
+                        //TODO move this to processPrintableImageSet so that we only save once.
+                        imageSet.isReadyForPrint = true;
+                        return printManager.save(imageSet);
+                    });
                 } else {
                     logger.info('There are no previous incomplete image sets for ' + user.getUsername());
                     return false;
@@ -212,6 +219,8 @@ function processReadyForPrintImageSet(user) {
         return false;
     }
 }
+
+Consumer.prototype.processReadyForPrintImageSet = processReadyForPrintImageSet;
 
 /**
  * Finds and saves images for the passed user and image set.
