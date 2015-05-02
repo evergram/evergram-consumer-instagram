@@ -40,7 +40,7 @@ TrackingManager.prototype.trackTaggedImages = function(user, imageSet, images) {
                 type: image.isOwner ? 'own' : 'friends',
                 isHistorical: moment(image.createdOn).isBefore(user.createdOn),
                 link: image.metadata.link,
-                image: image.raw,
+                image: image.src.raw,
                 period: user.getPeriodFromStartDate(imageSet.startDate),
                 createdOn: moment(image.createdOn).toDate(),
                 taggedOn: moment(image.taggedOn).toDate()
