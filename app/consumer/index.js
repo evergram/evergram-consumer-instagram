@@ -212,11 +212,16 @@ function processReadyForPrintImageSet(user) {
                     });
                 } else {
                     logger.info('There are no previous incomplete image sets for ' + user.getUsername());
-                    return false;
+                    return q.fcall(function() {
+                        return true;
+                    });
                 }
             });
     } else {
-        return false;
+        //TODO figure out a way to remove this as it's messy
+        return q.fcall(function() {
+            return true;
+        });
     }
 }
 
