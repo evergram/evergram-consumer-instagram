@@ -15,8 +15,16 @@ var printManager = common.print.manager;
 //init db
 common.db.connect();
 
-//var options = {criteria: {'instagram.username': 'jacq1313'}};
-var options = {};
+//var options = {criteria: {'instagram.username': 'joshystuart'}};
+var options = {
+    criteria: {
+        active: true,
+        signupComplete: true,
+        'instagram.authToken': {
+            $exists: true
+        }
+    }
+};
 
 //backfill
 userManager.findAll(options).then(function(users) {
@@ -28,16 +36,25 @@ userManager.findAll(options).then(function(users) {
     var current = 0;
     var process = function() {
         logger.info('Processing ' + current);
-        processImagesSetsForUser(processUsers[current]).then(function() {
-            logger.info('Done processing ' + current);
-            current++;
-            if (current <= processUsers.length) {
-                process();
-            } else {
-                logger.info('Done processing all');
-            }
-        });
+        if (!!processUsers[current]) {
+            processImagesSetsForUser(processUsers[current]).
+                then(function() {
+                    logger.info('Done processing ' + current);
+                }).
+                fail(function(err) {
+                    logger.error('Failed ' + current, err);
+                }).
+                done(function() {
+                    current++;
+                    if (current < processUsers.length) {
+                        process();
+                    } else {
+                        logger.info('Done processing all');
+                    }
+                });
+        }
     };
+
     process();
 });
 
@@ -46,7 +63,7 @@ function processImagesSetsForUser(user) {
     var numberOfPeriods = user.getCurrentPeriod();
     logger.info(user.getUsername() + ' has ' + numberOfPeriods + ' periods');
 
-    if (numberOfPeriods > 0) {
+    if (numberOfPeriods >= 0) {
         var periods = new Array(numberOfPeriods + 1);
 
         _.forEach(periods, function(period, i) {
@@ -74,57 +91,34 @@ function processImageSet(user, i) {
     printManager.find({
         criteria: {
             'user._id': user._id.toString(),
-            'startDate': {
-                '$gte': startDate1.toDate(),
-                '$lt': startDate2.toDate()
+            startDate: {
+                $gte: startDate1.toDate(),
+                $lt: startDate2.toDate()
             }
         }
     }).
         then(function(imageSet) {
-            if (!!imageSet) {
-                logger.info('Image set already exists for period ' + i + ' for ' + user.getUsername());
-                imageSet.period = i;
-                imageSet.save(function(err) {
-                    if (!!err) {
-                        logger.error(err);
-                    } else {
-                        logger.info('We are done updating the period with ' + i);
-                    }
-                    deferred.resolve();
-                });
-            } else {
-                logger.info('Getting new image set for period ' + i + ' for ' + user.getUsername());
-                var newImageSet = printManager.getNewPrintableImageSet(user, i);
-
-                consumer.processPrintableImageSet(user, newImageSet).
-                    then(function() {
-                        if (newImageSet.period != user.getCurrentPeriod() && newImageSet.images.instagram.length > 0) {
-                            newImageSet.isPrinted = true;
-                            newImageSet.isReadyForPrint = true;
-                            newImageSet.save(function(err) {
-                                if (!!err) {
-                                    logger.error(err);
-                                } else {
-                                    logger.info('Completed new image set for period ' + i + ' for ' +
-                                    user.getUsername());
-                                }
-                            });
-                            deferred.resolve();
-                        } else {
-                            deferred.resolve();
-                        }
-                    }).
-                    fail(function(err) {
-                        deferred.resolve();
-                        logger.error(err);
-                    });
+            if (!imageSet) {
+                imageSet = printManager.getNewPrintableImageSet(user, i);
             }
-        }).
-        fail(function(err) {
-            logger.error(err);
-            deferred.resolve();
-        }).
-        done();
+
+            consumer.processPrintableImageSet(user, imageSet).
+                then(function(newImageSet) {
+                    if (newImageSet.period !== user.getCurrentPeriod()) {
+                        newImageSet.isReadyForPrint = true;
+                        newImageSet.isPrinted = true;
+                        newImageSet.save();
+                    }
+
+                    logger.info('Completed new');
+                    deferred.resolve();
+                }).
+                fail(function(err) {
+                    logger.error(err);
+                    deferred.resolve();
+                }).
+                done();
+        });
 
     return deferred.promise;
 }
