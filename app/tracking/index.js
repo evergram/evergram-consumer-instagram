@@ -38,7 +38,7 @@ TrackingManager.prototype.trackTaggedImages = function(user, imageSet, images) {
                 service: 'instagram',
                 owner: image.owner,
                 type: image.isOwner ? 'own' : 'friends',
-                isHistorical: moment(image.createdOn).isBefore(user.createdOn),
+                isHistorical: moment(image.createdOn).isBefore(user.signupCompletedOn),
                 link: image.metadata.link,
                 image: image.src.raw,
                 period: user.getPeriodFromStartDate(imageSet.startDate),

@@ -144,6 +144,8 @@ function getImages(user) {
         });
 }
 
+Consumer.prototype.getImages = getImages;
+
 /**
  *
  * @param user
@@ -264,6 +266,8 @@ function processPrintableImageSet(user, printableImageSet) {
             return printManager.save(printableImageSet);
         });
 }
+
+Consumer.prototype.processPrintableImageSet = processPrintableImageSet;
 
 /**
  * Get the printable images for the user and image set.
