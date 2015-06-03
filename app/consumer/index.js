@@ -90,8 +90,7 @@ function getMessage() {
         }).
         fail(function(err) {
             deferred.reject(err);
-        }).
-        done();
+        });
 
     return deferred.promise;
 }
