@@ -41,6 +41,8 @@ TrackingManager.prototype.trackTaggedImages = function(user, imageSet, images) {
                 isHistorical: moment(image.createdOn).isBefore(user.signupCompletedOn),
                 link: image.metadata.link,
                 image: image.src.raw,
+                tag: image.tag,
+                action: image.action,
                 period: user.getPeriodFromStartDate(imageSet.startDate),
                 createdOn: moment(image.createdOn).toDate(),
                 taggedOn: moment(image.taggedOn).toDate()
