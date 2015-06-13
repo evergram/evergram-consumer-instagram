@@ -5,13 +5,11 @@
 
 module.exports = {
     //seconds
-    userNextRunDelay: 600,
+    userNextRunDelay: 300,
     sqs: {
         //seconds
-        waitTime: 1
+        waitTime: 20,
+        visibilityTime: 300
     },
-
-    //seconds
-    retryWaitTime: 10,
     track: false
 };

@@ -9,7 +9,6 @@ var moment = require('moment');
 var config = require('../config');
 var common = require('evergram-common');
 var logger = common.utils.logger;
-var sqs = common.aws.sqs;
 var instagramManager = common.instagram.manager;
 var printManager = common.print.manager;
 var userManager = common.user.manager;
@@ -24,28 +23,24 @@ function Consumer() {
 
 }
 
-Consumer.prototype.consume = function() {
-    var currentMessage;
+/**
+ *
+ * @param message
+ * @returns {*}
+ */
+Consumer.prototype.consume = function(message) {
     var currentUser;
 
     /**
      * Query SQS to get a message
      */
-    return getMessage().
-        then(function(message) {
-            currentMessage = message;
-            var id = message.Body.id;
-            /**
-             * Find the user
-             */
-            return getUser(id);
-        }).
+    return getUser(message.data.id).
         then(function(user) {
             currentUser = user;
             return getImages(user);
         }).
         finally(function() {
-            return cleanUp(currentMessage, currentUser);
+            return cleanUp(currentUser);
         });
 };
 
@@ -54,13 +49,8 @@ Consumer.prototype.consume = function() {
  * @param message
  * @param user
  */
-function cleanUp(message, user) {
+function cleanUp(user) {
     var deferreds = [];
-
-    if (!!message) {
-        logger.info('Cleaning up message ' + message.Body.id);
-        deferreds.push(deleteMessageFromQueue(message));
-    }
 
     if (!!user) {
         if (user.jobs.instagram.inQueue) {
@@ -70,29 +60,6 @@ function cleanUp(message, user) {
     }
 
     return q.all(deferreds);
-}
-
-/**
- * Gets the message from the queue and checks if it is valid.
- *
- * @returns {*|promise}
- */
-function getMessage() {
-    var deferred = q.defer();
-
-    sqs.getMessage(sqs.QUEUES.INSTAGRAM, {WaitTimeSeconds: config.sqs.waitTime}).
-        then(function(messages) {
-            if (!!messages[0].Body && !!messages[0].Body.id) {
-                deferred.resolve(messages[0]);
-            } else {
-                deferred.reject('No valid messages on the queue');
-            }
-        }).
-        fail(function(err) {
-            deferred.reject(err);
-        });
-
-    return deferred.promise;
 }
 
 /**
@@ -306,16 +273,6 @@ function getPrintableImages(user, printableImageSet) {
  */
 function getNextRunDate(dateRun) {
     return new Date(moment(dateRun).add(config.userNextRunDelay, 'seconds'));
-}
-
-/**
- * Convenience function to delete a message from the SQS.
- *
- * @param result
- * @returns {*}
- */
-function deleteMessageFromQueue(message) {
-    return sqs.deleteMessage(sqs.QUEUES.INSTAGRAM, message);
 }
 
 /**

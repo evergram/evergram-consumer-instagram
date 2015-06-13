@@ -2,13 +2,10 @@
 
 //var should = require('should');
 //var assert = require("assert");
+var Consumer = require('../../app/consumer');
 
 describe('Consumer', function() {
     describe('consume', function() {
-        var Consumer = require('../../app/consumer');
-        it('should fetch a valid message', function() {
-            Consumer.consume();
-        });
     });
 });
 
