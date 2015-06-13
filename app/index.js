@@ -9,8 +9,13 @@ var newrelic = require('newrelic');
 var logger = common.utils.logger;
 var config = require('./config');
 var consumer = require('./consumer');
-var Queue = require('slipstream').Queue;
-var Sqs = require('slipstream').providers.Sqs;
+var Queue = require('slipstream');
+var Sqs = require('slipstream-sqs');
+
+//watch for kill/shutdown
+process.on('SIGINT', function() {
+    logger.warning('Shutting down');
+});
 
 //init db
 common.db.connect();

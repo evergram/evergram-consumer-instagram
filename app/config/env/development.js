@@ -9,7 +9,7 @@ module.exports = {
     sqs: {
         //seconds
         waitTime: 20,
-        visibilityTime: 120
+        visibilityTime: 300
     },
     track: false
 };
