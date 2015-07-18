@@ -11,5 +11,11 @@ module.exports = {
         waitTime: 20,
         visibilityTime: 300
     },
+    plans: {
+        simpleLimit: {
+            limit: 2,
+            code: 'LIMIT50'
+        }
+    },
     track: false
 };
