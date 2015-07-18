@@ -12,10 +12,7 @@ module.exports = {
         visibilityTime: process.env.SQS_VISIBILITY_TIME || 600
     },
     plans: {
-        simpleLimit: {
-            limit: 50 || process.env.PLANS_SIMPLE_LIMIT,
-            code: 'LIMIT50' || process.env.PLANS_SIMPLE_LIMIT_CODE
-        }
+        simpleLimit: '[a-zA-Z]+\\-LIMIT\\-([0-9]+)' || process.env.PLANS_SIMPLE_LIMIT
     },
     track: process.env.TRACK_TAGGING || true
 };

@@ -12,10 +12,7 @@ module.exports = {
         visibilityTime: 300
     },
     plans: {
-        simpleLimit: {
-            limit: 2,
-            code: 'LIMIT50'
-        }
+        simpleLimit: '[a-zA-Z]+\\-LIMIT\\-([0-9]+)'
     },
     track: false
 };

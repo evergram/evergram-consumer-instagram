@@ -176,7 +176,7 @@ function processLimitedPrintImageSet(user) {
                 return processPrintableImageSet(user, imageSet).
                     then(function() {
                         //if there are no images left in the limit, set it ready for print.
-                        if (isAtSimpleLimit(imageSet)) {
+                        if (isAtSimpleLimit(user, imageSet)) {
                             imageSet.isReadyForPrint = true;
                         }
 
@@ -334,7 +334,7 @@ function getNextRunDate(dateRun) {
  * @param user
  */
 function isSimpleLimitPlan(user) {
-    return user.billing.option.toLowerCase() === config.plans.simpleLimit.code.toLowerCase();
+    return getSimpleLimitRegex().test(user.billing.option.toUpperCase());
 }
 
 /**
@@ -343,8 +343,33 @@ function isSimpleLimitPlan(user) {
  * @param printableImageSet
  * @returns {boolean}
  */
-function isAtSimpleLimit(printableImageSet) {
-    return printableImageSet.images[IMAGE_SERVICE_INSTAGRAM].length >= config.plans.simpleLimit.limit;
+function isAtSimpleLimit(user, printableImageSet) {
+    return printableImageSet.images[IMAGE_SERVICE_INSTAGRAM].length >= getSimpleLimit(user);
+}
+
+/**
+ * Gets the limit.
+ *
+ * @param text
+ * @returns {Number}
+ */
+function getSimpleLimit(user) {
+    var limit = parseInt(user.billing.option.toUpperCase().match(getSimpleLimitRegex())[1], 10);
+
+    if (isNaN(limit)) {
+        limit = 0;
+    }
+
+    return limit;
+}
+
+/**
+ * Gets the Simple Limit regex.
+ *
+ * @returns {RegExp}
+ */
+function getSimpleLimitRegex() {
+    return new RegExp(config.plans.simpleLimit);
 }
 
 /**
@@ -356,11 +381,11 @@ function isAtSimpleLimit(printableImageSet) {
  */
 function addImages(user, printableImageSet, images) {
     if (isSimpleLimitPlan(user)) {
-        var limit = config.plans.simpleLimit.limit;
+        var limit = getSimpleLimit(user);
         var currentNumImages = printableImageSet.images[IMAGE_SERVICE_INSTAGRAM].length;
 
         //double check if we aren't at the limit already
-        if (!isAtSimpleLimit(printableImageSet)) {
+        if (!isAtSimpleLimit(user, printableImageSet)) {
             _.forEach(images, function(image) {
                 //ensure that we are still below the limit, and that the image doesn't exist
                 if (currentNumImages < limit && !printableImageSet.containsImage(IMAGE_SERVICE_INSTAGRAM, image)) {
