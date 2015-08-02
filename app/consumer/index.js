@@ -5,6 +5,7 @@
  */
 
 var q = require('q');
+var _ = require('lodash');
 var moment = require('moment');
 var config = require('../config');
 var common = require('evergram-common');
@@ -13,6 +14,8 @@ var instagramManager = common.instagram.manager;
 var printManager = common.print.manager;
 var userManager = common.user.manager;
 var trackingManager = require('../tracking');
+
+var IMAGE_SERVICE_INSTAGRAM = 'instagram';
 
 /**
  * A consumer that handles all of the consumers
@@ -92,22 +95,33 @@ function getUser(id) {
 function getImages(user) {
     var dateRun = new Date();
 
-    /**
-     * process any previous image sets that haven't been closed out
-     */
-    return processReadyForPrintImageSet(user).
-        then(function() {
-            /**
-             * process the current images
-             */
-            return processCurrentImageSet(user);
-        }).
-        then(function() {
-            /**
-             * Save the user with a new last run and in queue state.
-             */
-            return updateUser(user, dateRun);
-        });
+    //TODO this is just a hack for the simple plan limit.
+    if (isSimpleLimitPlan(user)) {
+        return processLimitedPrintImageSet(user).
+            then(function() {
+                /**
+                 * Save the user with a new last run and in queue state.
+                 */
+                return updateUser(user, dateRun);
+            });
+    } else {
+        /**
+         * process any previous image sets that haven't been closed out
+         */
+        return processReadyForPrintImageSet(user).
+            then(function() {
+                /**
+                 * process the current images
+                 */
+                return processCurrentImageSet(user);
+            }).
+            then(function() {
+                /**
+                 * Save the user with a new last run and in queue state.
+                 */
+                return updateUser(user, dateRun);
+            });
+    }
 }
 
 Consumer.prototype.getImages = getImages;
@@ -137,6 +151,44 @@ function updateUser(user, lastRun) {
     user.jobs.instagram.inQueue = false;
 
     return userManager.update(user);
+}
+
+/**
+ * A temp function to process image sets that are limited.
+ *
+ * @param user
+ * @returns {*}
+ */
+function processLimitedPrintImageSet(user) {
+    logger.info('Checking for active limited print images for ' + user.getUsername());
+
+    return printManager.findAllByUser(user).
+        then(function(imageSets) {
+            var imageSet;
+
+            if (!!imageSets && !!imageSets[0]) {
+                imageSet = imageSets[0];
+            } else {
+                imageSet = printManager.getNewPrintableImageSet(user);
+            }
+
+            if (!imageSet.isReadyForPrint && !imageSet.isPrinted) {
+                return processPrintableImageSet(user, imageSet).
+                    then(function() {
+                        //if there are no images left in the limit, set it ready for print.
+                        if (isAtSimpleLimit(user, imageSet)) {
+                            imageSet.isReadyForPrint = true;
+                        }
+
+                        return printManager.save(imageSet);
+                    });
+            } else {
+                logger.info('There are no active limited print sets for ' + user.getUsername());
+                return q.fcall(function() {
+                    return true;
+                });
+            }
+        });
 }
 
 /**
@@ -172,12 +224,13 @@ function processReadyForPrintImageSet(user) {
         return printManager.findPreviousByUser(user).
             then(function(imageSet) {
                 if (!!imageSet && !imageSet.isReadyForPrint) {
-                    return processPrintableImageSet(user, imageSet).then(function() {
-                        //save the image set
-                        //TODO move this to processPrintableImageSet so that we only save once.
-                        imageSet.isReadyForPrint = true;
-                        return printManager.save(imageSet);
-                    });
+                    return processPrintableImageSet(user, imageSet).
+                        then(function() {
+                            //save the image set
+                            //TODO move this to processPrintableImageSet so that we only save once.
+                            imageSet.isReadyForPrint = true;
+                            return printManager.save(imageSet);
+                        });
                 } else {
                     logger.info('There are no previous incomplete image sets for ' + user.getUsername());
                     return q.fcall(function() {
@@ -222,7 +275,7 @@ function processPrintableImageSet(user, printableImageSet) {
             /**
              * Add the new images.
              */
-            printableImageSet.addImages('instagram', images);
+            addImages(user, printableImageSet, images);
 
             logger.info('Saving image set ' + printableImageSet._id + ' for ' + user.getUsername());
 
@@ -273,6 +326,77 @@ function getPrintableImages(user, printableImageSet) {
  */
 function getNextRunDate(dateRun) {
     return new Date(moment(dateRun).add(config.userNextRunDelay, 'seconds'));
+}
+
+/**
+ * Tests if the current user has the simple limit plan.
+ *
+ * @param user
+ */
+function isSimpleLimitPlan(user) {
+    return getSimpleLimitRegex().test(user.billing.option.toUpperCase());
+}
+
+/**
+ * Checks if the current image set is at it's limit.
+ *
+ * @param printableImageSet
+ * @returns {boolean}
+ */
+function isAtSimpleLimit(user, printableImageSet) {
+    return printableImageSet.images[IMAGE_SERVICE_INSTAGRAM].length >= getSimpleLimit(user);
+}
+
+/**
+ * Gets the limit.
+ *
+ * @param text
+ * @returns {Number}
+ */
+function getSimpleLimit(user) {
+    var limit = parseInt(user.billing.option.toUpperCase().match(getSimpleLimitRegex())[1], 10);
+
+    if (isNaN(limit)) {
+        limit = 0;
+    }
+
+    return limit;
+}
+
+/**
+ * Gets the Simple Limit regex.
+ *
+ * @returns {RegExp}
+ */
+function getSimpleLimitRegex() {
+    return new RegExp(config.plans.simpleLimit);
+}
+
+/**
+ * Add the found images to the image set.
+ *
+ * @param user
+ * @param printableImageSet
+ * @param images
+ */
+function addImages(user, printableImageSet, images) {
+    if (isSimpleLimitPlan(user)) {
+        var limit = getSimpleLimit(user);
+        var currentNumImages = printableImageSet.images[IMAGE_SERVICE_INSTAGRAM].length;
+
+        //double check if we aren't at the limit already
+        if (!isAtSimpleLimit(user, printableImageSet)) {
+            _.forEach(images, function(image) {
+                //ensure that we are still below the limit, and that the image doesn't exist
+                if (currentNumImages < limit && !printableImageSet.containsImage(IMAGE_SERVICE_INSTAGRAM, image)) {
+                    printableImageSet.addImage(IMAGE_SERVICE_INSTAGRAM, image);
+                    currentNumImages++;
+                }
+            });
+        }
+    } else {
+        printableImageSet.addImages(IMAGE_SERVICE_INSTAGRAM, images);
+    }
 }
 
 /**
