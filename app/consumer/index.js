@@ -156,6 +156,8 @@ function updateUser(user, lastRun) {
 /**
  * A temp function to process image sets that are limited.
  *
+ * //TODO remove at a later date.
+ *
  * @param user
  * @returns {*}
  */
@@ -263,7 +265,7 @@ function processPrintableImageSet(user, printableImageSet) {
      */
     return getPrintableImages(user, printableImageSet).
         then(function(images) {
-            logger.info('Found ' + images.length + ' images for ' + user.getUsername());
+            logger.info('Found ' + images.length + ' images in total for ' + user.getUsername());
 
             /**
              * Track the images

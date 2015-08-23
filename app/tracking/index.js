@@ -29,11 +29,13 @@ function TrackingManager() {
 TrackingManager.prototype.trackTaggedImages = function(user, imageSet, images) {
     var deferreds = [];
     var event = 'Tagged a photo';
-
-    logger.info('Tracking ' + event + ' for ' + user.getUsername());
+    var numberOfImages = imageSet.getNumberOfImages();
+    var numberOfNewImages = 0;
 
     _.forEach(images, function(image) {
         if (!imageSet.containsImage('instagram', image)) {
+            numberOfNewImages++;
+
             var deferred = trackingManager.trackEvent(user, event, {
                 service: 'instagram',
                 owner: image.owner,
@@ -45,12 +47,20 @@ TrackingManager.prototype.trackTaggedImages = function(user, imageSet, images) {
                 action: image.action,
                 period: user.getPeriodFromStartDate(imageSet.startDate),
                 createdOn: moment(image.createdOn).toDate(),
-                taggedOn: moment(image.taggedOn).toDate()
+                taggedOn: moment(image.taggedOn).toDate(),
+                count: (numberOfImages + numberOfNewImages)
             }, image.taggedOn);
 
             deferreds.push(deferred);
         }
     });
+
+    if (numberOfNewImages > 0) {
+        logger.info('Found ' + numberOfNewImages + ' new images for ' + user.getUsername());
+        logger.info('Tracking ' + event + ' for ' + user.getUsername());
+    } else {
+        logger.info('No new images found for ' + user.getUsername());
+    }
 
     return q.all(deferreds);
 };
