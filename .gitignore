@@ -1,5 +1,7 @@
-**/node_modules/**
-.idea
+/node_modules/
+/tmp/
 *.iml
 *.log
-coverage
+/shippable
+/coverage
+xunit.xml
