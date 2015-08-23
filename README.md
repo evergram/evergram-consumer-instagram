@@ -1,5 +1,7 @@
 #Evergram Instagram Consumer
 
+[![Shippable](https://img.shields.io/shippable/557f6f2fedd7f2c052192757.svg)](https://app.shippable.com/projects/557f6f2fedd7f2c052192757)
+
 A service that communicates with an instagram SQS, retrieves photos, and saves the result to the DB.
 
 ###Install Node.JS
