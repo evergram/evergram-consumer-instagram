@@ -299,9 +299,17 @@ Consumer.prototype.processPrintableImageSet = processPrintableImageSet;
  */
 function getPrintableImages(user, printableImageSet) {
     /**
-     * If we are a new user we won't put any date restrictions on the query
+     * If we are a limit plan don't date constrain the images
      */
-    if (user.isInFirstPeriod() || printableImageSet.period === 0) {
+    if (isSimpleLimitPlan(user)) {
+        logger.info('Running ' + user.getUsername() + ' in limit plan mode');
+
+        return instagramManager
+            .findPrintableImagesByUser(user);
+    } else if (user.isInFirstPeriod() || printableImageSet.period === 0) {
+        /**
+         * If we are a new user we won't put any date restrictions on the query
+         */
         logger.info('Running ' + user.getUsername() + ' from the beginning of time to ' + printableImageSet.endDate);
 
         return instagramManager
