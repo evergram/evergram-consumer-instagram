@@ -39,6 +39,9 @@ TrackingManager.prototype.trackTaggedImages = function(user, imageSet, images) {
             var deferred = trackingManager.trackEvent(user, event, {
                 service: 'instagram',
                 owner: image.owner,
+                email: user.email,
+                instagramUsername: user.getUsername(),
+                plan: user.billing.option,
                 type: image.isOwner ? 'own' : 'friends',
                 isHistorical: moment(image.createdOn).isBefore(user.signupCompletedOn),
                 link: image.metadata.link,
