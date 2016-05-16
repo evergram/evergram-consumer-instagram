@@ -275,6 +275,11 @@ function processPrintableImageSet(user, printableImageSet) {
             }
 
             /**
+             * Set image print dimensions
+             */
+            setPrintSize(images);
+
+            /**
              * Add the new images.
              */
             addImages(user, printableImageSet, images);
@@ -407,6 +412,28 @@ function addImages(user, printableImageSet, images) {
     } else {
         printableImageSet.addImages(IMAGE_SERVICE_INSTAGRAM, images);
     }
+}
+
+/**
+ * Set the metadata.printSize attribute to the most appropriate print dimensions for this photos (e.g. 6x4, 4x4, etc.)
+ * based on the image dimensions.
+ * 
+ * @param images
+ */
+function setPrintSize(images) {
+
+    _.forEach(images, function(image) {
+
+        var width = image.metadata.images.standard_resolution.width;
+        var height = image.metadata.images.standard_resolution.height;
+
+        if (height === width) {
+            image.metadata.printSize = common.config.print.sizes.SQUARE;
+        } else {
+            image.metadata.printSize = common.config.print.sizes.STANDARD;
+        }
+
+    });
 }
 
 /**
