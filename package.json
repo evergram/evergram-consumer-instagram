@@ -11,7 +11,7 @@
     "author": "Josh Stuart <joshstuartx@gmail.com>",
     "repository": {
         "type": "git",
-        "url": "https://github.com/evergram/evergram-consumer-manager.git"
+        "url": "https://github.com/evergram/evergram-consumer-manager.git#master"
     },
     "scripts": {
         "lint": "./node_modules/.bin/jshint ./app",
