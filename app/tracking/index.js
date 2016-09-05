@@ -40,7 +40,7 @@ TrackingManager.prototype.trackTaggedImages = function(user, imageSet, images) {
                 service: 'instagram',
                 owner: image.owner,
                 email: user.email,
-                instagramUsername: user.getUsername(),
+                instagramUsername: user.instagram.username,
                 plan: user.billing.option,
                 type: image.isOwner ? 'own' : 'friends',
                 isHistorical: moment(image.createdOn).isBefore(user.signupCompletedOn),

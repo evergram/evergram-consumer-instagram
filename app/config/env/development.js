@@ -14,5 +14,5 @@ module.exports = {
     plans: {
         simpleLimit: '[a-zA-Z]+\\-LIMIT\\-([0-9]+)'
     },
-    track: false
+    track: true
 };
